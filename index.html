@@ -3485,20 +3485,23 @@
           <div class="contact-form-card">
             <h3>Hızlı Mesaj &amp; İçerik Önerisi</h3>
             <p>Yeni makale, ders notu veya araç önerisi için formu doldurabilirsin.</p>
-            <form id="contact-form" novalidate>
+            <form id="contact-form" action="https://formsubmit.co/ohuharita.platform@gmail.com" method="POST" target="_blank" novalidate>
+              <input type="hidden" name="_subject" value="[OHU Harita] Yeni İletişim Mesajı">
+              <input type="hidden" name="_template" value="table">
+              <input type="hidden" name="_next" value="https://ohuharita-platform.github.io/#iletisim">
               <div class="lab-grid-2">
                 <div class="lab-form-group">
                   <label for="c-name">Ad Soyad</label>
-                  <input class="lab-input" type="text" id="c-name" required placeholder="Örn. Ayşe Yılmaz">
+                  <input class="lab-input" type="text" id="c-name" name="Ad Soyad" required placeholder="Örn. Ayşe Yılmaz">
                 </div>
                 <div class="lab-form-group">
                   <label for="c-mail">E-posta</label>
-                  <input class="lab-input" type="email" id="c-mail" required placeholder="ornek@eposta.com">
+                  <input class="lab-input" type="email" id="c-mail" name="E-posta" required placeholder="ornek@eposta.com">
                 </div>
               </div>
               <div class="lab-form-group">
                 <label for="c-topic">Konu</label>
-                <select class="lab-select" id="c-topic">
+                <select class="lab-select" id="c-topic" name="Konu">
                   <option value="Genel soru">Genel soru</option>
                   <option value="İçerik / kaynak önerisi">İçerik / kaynak önerisi</option>
                   <option value="Hata bildirimi">Hata bildirimi</option>
@@ -3507,9 +3510,12 @@
               </div>
               <div class="lab-form-group">
                 <label for="c-msg">Mesaj</label>
-                <textarea id="c-msg" required placeholder="Kısa mesajını yaz..."></textarea>
+                <textarea id="c-msg" name="Mesaj" required placeholder="Kısa mesajını yaz..."></textarea>
               </div>
-              <button class="submit-btn" type="submit" id="contact-submit-btn">Mesajı Gönder ↗</button>
+              <div style="display:grid;gap:10px;">
+                <button class="submit-btn" type="submit" id="contact-submit-btn">Web Formu ile Gönder ↗</button>
+                <button class="geo-secondary-btn" type="button" id="contact-mailto-btn" style="width:100%;">Gmail / E-posta Uygulamasıyla Gönder ✉</button>
+              </div>
               <div class="form-feedback" id="form-feedback" role="status" aria-live="polite"></div>
             </form>
           </div>
@@ -7070,57 +7076,45 @@
 
       const contactForm = document.getElementById('contact-form');
       const formFeedback = document.getElementById('form-feedback');
-      const submitBtn = document.getElementById('contact-submit-btn');
-      contactForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        const name = document.getElementById('c-name').value.trim();
-        const mail = document.getElementById('c-mail').value.trim();
-        const topic = document.getElementById('c-topic').value;
-        const msg = document.getElementById('c-msg').value.trim();
+      const mailtoBtn = document.getElementById('contact-mailto-btn');
 
-        if (!name || !mail || mail.indexOf('@') === -1 || msg.length < 5) {
+      function readContactFields() {
+        return {
+          name: document.getElementById('c-name').value.trim(),
+          mail: document.getElementById('c-mail').value.trim(),
+          topic: document.getElementById('c-topic').value,
+          msg: document.getElementById('c-msg').value.trim()
+        };
+      }
+
+      function validateContact(d) {
+        if (!d.name || !d.mail || d.mail.indexOf('@') === -1 || d.msg.length < 3) {
           formFeedback.className = 'form-feedback err';
-          formFeedback.textContent = 'Lütfen ad, geçerli bir e-posta adresi ve en az 5 karakterlik bir mesaj gir.';
+          formFeedback.textContent = 'Lütfen ad, geçerli bir e-posta adresi ve kısa bir mesaj gir.';
+          return false;
+        }
+        return true;
+      }
+
+      contactForm.addEventListener('submit', function (e) {
+        const d = readContactFields();
+        if (!validateContact(d)) {
+          e.preventDefault();
           return;
         }
+        formFeedback.className = 'form-feedback ok';
+        formFeedback.textContent = 'Form yeni sekmede gönderiliyor. İlk kullanımda ohuharita.platform@gmail.com gelen kutusuna (veya Spam klasörüne) gelen aktivasyon bağlantısını bir kez onaylaman gerekir.';
+        showToast('Mesaj gönderiliyor...');
+      });
 
-        const subject = encodeURIComponent('[OHU Harita] ' + topic + ' — ' + name);
-        const body = encodeURIComponent('Ad Soyad: ' + name + '\nE-posta: ' + mail + '\nKonu: ' + topic + '\n\nMesaj:\n' + msg);
-        const mailtoHref = 'mailto:ohuharita.platform@gmail.com?subject=' + subject + '&body=' + body;
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Gönderiliyor...';
-
-        fetch('https://formsubmit.co/ajax/ohuharita.platform@gmail.com', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            _subject: '[OHU Harita] ' + topic + ' — ' + name,
-            Ad_Soyad: name,
-            Eposta: mail,
-            Konu: topic,
-            Mesaj: msg,
-            _template: 'table'
-          })
-        }).then(function (res) {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        }).then(function () {
-          formFeedback.className = 'form-feedback ok';
-          formFeedback.textContent = 'Teşekkürler ' + name + '! Mesajın ohuharita.platform@gmail.com adresine doğrudan iletildi.';
-          showToast('Mesajın başarıyla gönderildi.');
-          contactForm.reset();
-        }).catch(function () {
-          formFeedback.className = 'form-feedback ok';
-          formFeedback.innerHTML = 'Otomatik gönderim şu an yanıt vermedi. Tek tıkla e-posta uygulamanla göndermek için <a href="' + mailtoHref + '" style="font-weight:700;text-decoration:underline;">buraya dokun ↗</a>.';
-          showToast('E-posta bağlantısı hazırlandı.');
-        }).finally(function () {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Mesajı Gönder ↗';
-        });
+      mailtoBtn.addEventListener('click', function () {
+        const d = readContactFields();
+        if (!validateContact(d)) return;
+        const subject = encodeURIComponent('[OHU Harita] ' + d.topic + ' — ' + d.name);
+        const body = encodeURIComponent('Ad Soyad: ' + d.name + '\nE-posta: ' + d.mail + '\nKonu: ' + d.topic + '\n\nMesaj:\n' + d.msg);
+        window.location.href = 'mailto:ohuharita.platform@gmail.com?subject=' + subject + '&body=' + body;
+        formFeedback.className = 'form-feedback ok';
+        formFeedback.textContent = 'E-posta uygulaman ohuharita.platform@gmail.com alıcısıyla açılıyor.';
       });
     })();
   </script>
