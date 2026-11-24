@@ -4815,7 +4815,7 @@
         return '<section class="topic-panel" id="detail-sec-cases"><h2>Örnek saha ve araştırma çalışmaları</h2><p style="margin-bottom:12px;">Çalışmanın amacı, veri işleme adımları, çıktıları ve ilgili bilimsel makaleleri için karta dokun:</p><div class="case-study-grid">' + cards + '</div></section>';
       }
 
-      function openCaseStudy(spec, triggerEl) {
+      function openCaseStudy(spec, triggerEl, skipHistory) {
         const parts = String(spec || '').split('|');
         if (parts.length !== 3) return;
         const parentType = parts[0];
@@ -4899,6 +4899,10 @@
         nextBtn.removeAttribute('data-go-faculty');
         nextBtn.removeAttribute('data-go-dept');
         nextBtn.setAttribute('data-go-case', parentType + '|' + parentId + '|' + otherIdx);
+
+        if (!skipHistory) {
+          pushModalState({ view: 'case', id: spec }, '#calisma-' + parentId + '-' + caseIdx);
+        }
 
         view.hidden = false;
         view.scrollTop = 0;
@@ -5077,7 +5081,17 @@
       let currentTopicKey = null;
       let lastTriggerEl = null;
 
-      function openTopic(key, triggerEl) {
+      let modalDepth = 0;
+      const BASE_URL = window.location.pathname + window.location.search;
+
+      function pushModalState(stateObj, hashStr) {
+        try {
+          history.pushState(stateObj, '', BASE_URL + hashStr);
+          modalDepth++;
+        } catch (err) {}
+      }
+
+      function openTopic(key, triggerEl, skipHistory) {
         const d = TOPICS[key];
         if (!d) return;
         currentTopicKey = key;
@@ -5142,17 +5156,32 @@
         prevBtn.setAttribute('data-go-topic', prevKey);
         nextBtn.setAttribute('data-go-topic', nextKey);
 
+        if (!skipHistory) {
+          pushModalState({ view: 'topic', id: key }, '#konu-' + key);
+        }
+
         view.hidden = false;
         view.scrollTop = 0;
         document.body.style.overflow = 'hidden';
         closeBtn.focus();
       }
 
-      function closeTopic() {
+      function closeTopicVisual() {
         view.hidden = true;
         document.body.style.overflow = '';
         if (lastTriggerEl && typeof lastTriggerEl.focus === 'function') {
           lastTriggerEl.focus();
+        }
+      }
+
+      function closeTopic() {
+        closeTopicVisual();
+        if (modalDepth > 0) {
+          const steps = modalDepth;
+          modalDepth = 0;
+          try {
+            history.go(-steps);
+          } catch (err) {}
         }
       }
 
@@ -5211,6 +5240,22 @@
         e.preventDefault();
         closeTopic();
       });
+      window.addEventListener('popstate', function (e) {
+        const st = e.state;
+        if (st && st.view) {
+          modalDepth = Math.max(1, modalDepth - 1);
+          if (st.view === 'topic') openTopic(st.id, null, true);
+          else if (st.view === 'faculty') openFaculty(st.id, null, true);
+          else if (st.view === 'dept') openDepartment(st.id, null, true);
+          else if (st.view === 'case') openCaseStudy(st.id, null, true);
+        } else {
+          modalDepth = 0;
+          if (!view.hidden) {
+            closeTopicVisual();
+          }
+        }
+      });
+
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && !view.hidden) {
           closeTopic();
@@ -6214,7 +6259,7 @@
         });
       });
 
-      function openFaculty(facId, triggerEl) {
+      function openFaculty(facId, triggerEl, skipHistory) {
         const idx = FACULTY.findIndex(function (x) { return x.id === facId; });
         if (idx === -1) return;
         const f = FACULTY[idx];
@@ -6281,6 +6326,10 @@
         nextBtn.removeAttribute('data-go-case');
         prevBtn.setAttribute('data-go-faculty', prevFac.id);
         nextBtn.setAttribute('data-go-faculty', nextFac.id);
+
+        if (!skipHistory) {
+          pushModalState({ view: 'faculty', id: facId }, '#hoca-' + facId);
+        }
 
         view.hidden = false;
         view.scrollTop = 0;
@@ -6538,7 +6587,7 @@
       }
       renderDeptGrid();
 
-      function openDepartment(deptId, triggerEl) {
+      function openDepartment(deptId, triggerEl, skipHistory) {
         const idx = DEPARTMENTS.findIndex(function (x) { return x.id === deptId; });
         if (idx === -1) return;
         const d = DEPARTMENTS[idx];
@@ -6599,6 +6648,10 @@
         nextBtn.removeAttribute('data-go-case');
         prevBtn.setAttribute('data-go-dept', prevDept.id);
         nextBtn.setAttribute('data-go-dept', nextDept.id);
+
+        if (!skipHistory) {
+          pushModalState({ view: 'dept', id: deptId }, '#anabilim-' + deptId);
+        }
 
         view.hidden = false;
         view.scrollTop = 0;
