@@ -3349,7 +3349,10 @@
     </div>
     <header class="topic-head">
       <a class="topic-brand" href="#anasayfa" id="topic-home">OHU<span>⌖</span> HARİTA</a>
-      <button class="topic-back" type="button" id="topic-close">← Ana sayfaya dön</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="topic-back" type="button" id="topic-step-back">← Geri</button>
+        <button class="topic-back" type="button" id="topic-close" style="background:var(--navy);color:var(--gold-light);border-color:var(--navy);">Ana Sayfa</button>
+      </div>
     </header>
     <section class="topic-hero">
       <div class="topic-hero-inner" id="topic-hero-inner">
@@ -5081,14 +5084,24 @@
       let currentTopicKey = null;
       let lastTriggerEl = null;
 
-      let modalDepth = 0;
-      const BASE_URL = window.location.pathname + window.location.search;
+      const viewStack = [];
+      let suppressHashSync = false;
+      const stepBackBtn = document.getElementById('topic-step-back');
 
       function pushModalState(stateObj, hashStr) {
+        const last = viewStack[viewStack.length - 1];
+        if (!last || last.hash !== hashStr) {
+          viewStack.push({ view: stateObj.view, id: stateObj.id, hash: hashStr });
+        }
         try {
-          history.pushState(stateObj, '', BASE_URL + hashStr);
-          modalDepth++;
-        } catch (err) {}
+          if (window.location.hash !== hashStr) {
+            suppressHashSync = true;
+            window.location.hash = hashStr;
+            setTimeout(function () { suppressHashSync = false; }, 0);
+          }
+        } catch (err) {
+          suppressHashSync = false;
+        }
       }
 
       function openTopic(key, triggerEl, skipHistory) {
@@ -5174,16 +5187,37 @@
         }
       }
 
-      function closeTopic() {
-        closeTopicVisual();
-        if (modalDepth > 0) {
-          const steps = modalDepth;
-          modalDepth = 0;
-          try {
-            history.go(-steps);
-          } catch (err) {}
+      function stepBackOnePage() {
+        if (viewStack.length > 1) {
+          viewStack.pop();
+          const prev = viewStack[viewStack.length - 1];
+          suppressHashSync = true;
+          try { window.location.hash = prev.hash; } catch (err) {}
+          setTimeout(function () { suppressHashSync = false; }, 0);
+          if (prev.view === 'topic') openTopic(prev.id, null, true);
+          else if (prev.view === 'faculty') openFaculty(prev.id, null, true);
+          else if (prev.view === 'dept') openDepartment(prev.id, null, true);
+          else if (prev.view === 'case') openCaseStudy(prev.id, null, true);
+        } else {
+          closeTopic();
         }
       }
+
+      function closeTopic() {
+        viewStack.length = 0;
+        closeTopicVisual();
+        try {
+          if (window.location.hash && /^#(konu|hoca|anabilim|calisma)-/.test(window.location.hash)) {
+            suppressHashSync = true;
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            setTimeout(function () { suppressHashSync = false; }, 0);
+          }
+        } catch (err) {
+          suppressHashSync = false;
+        }
+      }
+
+      stepBackBtn.addEventListener('click', stepBackOnePage);
 
       document.addEventListener('click', function (e) {
         const jumpBtn = e.target.closest('[data-jump-detail]');
@@ -5240,21 +5274,35 @@
         e.preventDefault();
         closeTopic();
       });
-      window.addEventListener('popstate', function (e) {
-        const st = e.state;
-        if (st && st.view) {
-          modalDepth = Math.max(1, modalDepth - 1);
-          if (st.view === 'topic') openTopic(st.id, null, true);
-          else if (st.view === 'faculty') openFaculty(st.id, null, true);
-          else if (st.view === 'dept') openDepartment(st.id, null, true);
-          else if (st.view === 'case') openCaseStudy(st.id, null, true);
-        } else {
-          modalDepth = 0;
-          if (!view.hidden) {
-            closeTopicVisual();
+      function syncFromHash() {
+        if (suppressHashSync) return;
+        const h = window.location.hash || '';
+        if (h.indexOf('#konu-') === 0) {
+          openTopic(h.slice(6), null, true);
+        } else if (h.indexOf('#hoca-') === 0) {
+          openFaculty(h.slice(6), null, true);
+        } else if (h.indexOf('#anabilim-') === 0) {
+          openDepartment(h.slice(10), null, true);
+        } else if (h.indexOf('#calisma-') === 0) {
+          const raw = h.slice(9);
+          const lastDash = raw.lastIndexOf('-');
+          if (lastDash > 0) {
+            const pId = raw.slice(0, lastDash);
+            const idx = raw.slice(lastDash + 1);
+            const pType = DEPARTMENTS.some(function (d) { return d.id === pId; }) ? 'dept' : 'topic';
+            openCaseStudy(pType + '|' + pId + '|' + idx, null, true);
           }
+        } else if (!view.hidden) {
+          viewStack.length = 0;
+          closeTopicVisual();
         }
-      });
+      }
+
+      window.addEventListener('hashchange', syncFromHash);
+      window.addEventListener('popstate', syncFromHash);
+      if (/^#(konu|hoca|anabilim|calisma)-/.test(window.location.hash || '')) {
+        syncFromHash();
+      }
 
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && !view.hidden) {
